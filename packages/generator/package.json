@@ -15,6 +15,7 @@
     "dev": "npx tsc -w",
     "build": "npx tsc",
     "prepack": "npm run build",
+    "pack": "npx esbuild --platform=node dist/bin.js --bundle --outfile=dist/bundle.js && npx terser dist/bundle.js -c -o dist/prisma-erd-generator-markdown.js",
     "test": "jest"
   },
   "dependencies": {
