@@ -5,20 +5,22 @@ type Relationship = {
   to: string
   name: string
   arrow:
-  | '}|--||'
-  | '||--||'
-  | '||--|{'
-  | '}|--|{'
-  | '}o--||'
-  | '||--||'
-  | '||--o{'
-  | '}|--|{'
+    | '}|--||'
+    | '||--||'
+    | '||--|{'
+    | '}|--|{'
+    | '}o--||'
+    | '||--||'
+    | '||--o{'
+    | '}|--|{'
+    | '}o--o{'
 }
 
 export default function genMermaid(datamodel: DMMF.Datamodel) {
   let mermaid = `erDiagram
 `
   const relationships: (Relationship | string)[] = []
+  const candidateManyToMany: Relationship[] = []
   const typeToDBName = new Map<string, string>()
   datamodel.models.forEach(async (modelInfo) => {
     const modelName = modelInfo.dbName || modelInfo.name
@@ -64,15 +66,33 @@ export default function genMermaid(datamodel: DMMF.Datamodel) {
           relationship.arrow = '}|--|{'
         }
         relationships.push(relationship)
-      }
+      } else {
+        const relationship: Relationship = {
+          from: modelName,
+          to: typeToDBName.get(field.type) || field.type,
+          name: fieldName,
+          arrow: '}o--o{'
+        }
+        const existing = candidateManyToMany.find((r) => {
+          if (typeof r === 'object') {
+            return r.from === relationship.to && r.to === relationship.from
+          }
+          return false
+        })
+        if (existing) {
+          relationships.push(relationship);
+        } else {
+          candidateManyToMany.push(relationship);
+        }
+       }
     })
     otherFields.forEach((field) => {
       const fieldName = field.dbName || field.name
       const nullable = !field.isRequired ? 'nullable' : ''
       if (field.kind === 'scalar') {
-        const key = field.isId ? 'PK' : foreignKeys.has(fieldName) ? 'FK' : ''
-        // @ts-ignore
+        const key = field.isId ? 'PK' : foreignKeys.has(fieldName) ? 'FK' : field.isUnique ? 'UK' : ''
         const defaultValue = field.default
+          // @ts-ignore
           ? `${field.default.name}(${field.default.args?.join(', ')})`
           : ''
         const comments = [nullable, defaultValue].filter((c) => c).join(', ')
@@ -110,7 +130,7 @@ export default function genMermaid(datamodel: DMMF.Datamodel) {
     if (typeof relationship === 'string') {
       mermaid += relationship
     } else {
-      mermaid += `\t${relationship.from} ${relationship.arrow} ${relationship.to} : ${relationship.name}\n`
+      mermaid += `\t${relationship.from} ${relationship.arrow} ${relationship.to} : ""\n`
     }
   })
   const markdown = `\`\`\`mermaid
